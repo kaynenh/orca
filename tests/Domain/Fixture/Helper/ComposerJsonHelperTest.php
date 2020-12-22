@@ -28,9 +28,9 @@ use Prophecy\Argument;
  */
 class ComposerJsonHelperTest extends TestCase {
 
-  private const CONFIG_KEY = 'extra.orca.options';
+  private const COMPOSER_JSON = 'composer.json';
 
-  private const FILENAME = 'composer.json';
+  private const CONFIG_KEY = 'extra.orca.options';
 
   private $rawFixtureOptions = [
     'bare' => TRUE,
@@ -48,7 +48,7 @@ class ComposerJsonHelperTest extends TestCase {
       ->exists()
       ->willReturn(TRUE);
     $this->fixture
-      ->exists(self::FILENAME)
+      ->exists(self::COMPOSER_JSON)
       ->willReturn(TRUE);
     $this->fixture
       ->getPath(Argument::any())
@@ -91,7 +91,7 @@ class ComposerJsonHelperTest extends TestCase {
   }
 
   private function getTestComposerJsonRaw(): string {
-    return file_get_contents(__DIR__ . '/' . self::FILENAME);
+    return file_get_contents(__DIR__ . '/' . self::COMPOSER_JSON);
   }
 
   private function getTestComposerJsonData(): array {
@@ -111,7 +111,7 @@ class ComposerJsonHelperTest extends TestCase {
   public function testAddRepository(): void {
     $config = new Config($this->getTestComposerJsonRaw(), new Json(), TRUE);
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->willReturn($config);
     $composer_json = $this->createComposerJsonHelperWithConfigSpy();
 
@@ -147,7 +147,7 @@ class ComposerJsonHelperTest extends TestCase {
   public function testAddInstallerPath(): void {
     $config = new Config($this->getTestComposerJsonRaw(), new Json(), TRUE);
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->willReturn($config);
     $composer_json = $this->createComposerJsonHelperWithConfigSpy();
 
@@ -197,7 +197,7 @@ class ComposerJsonHelperTest extends TestCase {
 
   public function testAddInstallerPathEmpty(): void {
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->shouldNotBeCalled();
     $composer_json = $this->createComposerJsonHelper();
 
@@ -207,7 +207,7 @@ class ComposerJsonHelperTest extends TestCase {
   public function testSetPreferInstallFromSource(): void {
     $config = new Config($this->getTestComposerJsonRaw(), new Json(), TRUE);
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->willReturn($config);
     $composer_json = $this->createComposerJsonHelperWithConfigSpy();
 
@@ -229,7 +229,7 @@ class ComposerJsonHelperTest extends TestCase {
 
   public function testSetPreferInstallFromSourceEmpty(): void {
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->shouldNotBeCalled();
     $composer_json = $this->createComposerJsonHelper();
 
@@ -239,7 +239,7 @@ class ComposerJsonHelperTest extends TestCase {
   public function testGetFixtureOptions(): void {
     $config = new Config($this->getTestComposerJsonWithFixtureOptionsRaw(), new Json(), TRUE);
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->shouldBeCalledOnce()
       ->willReturn($config);
     $provided_options = $this->createFixtureOptions($this->rawFixtureOptions);
@@ -268,7 +268,7 @@ class ComposerJsonHelperTest extends TestCase {
 
   public function testGetNoComposerJson(): void {
     $this->fixture
-      ->exists(self::FILENAME)
+      ->exists(self::COMPOSER_JSON)
       ->willReturn(FALSE);
     $this->expectException(OrcaFileNotFoundException::class);
     $composer_json = $this->createComposerJsonHelper();
@@ -281,7 +281,7 @@ class ComposerJsonHelperTest extends TestCase {
     $this->drupalCoreVersionFinder = $this->prophesize(DrupalCoreVersionResolver::class);
     $this->configLoader = $this->prophesize(ConfigLoader::class);
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->willReturn($config);
     $this->expectException(LogicException::class);
     $composer_json = $this->createComposerJsonHelper();
@@ -291,7 +291,7 @@ class ComposerJsonHelperTest extends TestCase {
 
   public function testGetInvalidComposerJson(): void {
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->willThrow(OrcaParseError::class);
     $this->expectException(OrcaParseError::class);
     $composer_json = $this->createComposerJsonHelper();
@@ -309,7 +309,7 @@ class ComposerJsonHelperTest extends TestCase {
     $config->toFile(Argument::any())
       ->shouldBeCalledOnce();
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->willReturn($config);
     $composer_json = $this->createComposerJsonHelper();
 
@@ -328,10 +328,10 @@ class ComposerJsonHelperTest extends TestCase {
     $config = $this->prophesize(Config::class);
     $config->set(self::CONFIG_KEY, $this->rawFixtureOptions)
       ->shouldBeCalledOnce();
-    $config->toFile(self::FILENAME)
+    $config->toFile(self::COMPOSER_JSON)
       ->shouldBeCalledOnce();
     $this->configLoader
-      ->load(self::FILENAME)
+      ->load(self::COMPOSER_JSON)
       ->willReturn($config->reveal());
     $options = $this->createFixtureOptions($this->rawFixtureOptions);
     $this->fixtureOptionsFactory

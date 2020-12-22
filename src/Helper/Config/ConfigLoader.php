@@ -10,6 +10,7 @@ use Exception;
 use Noodlehaus\Config;
 use Noodlehaus\Exception\FileNotFoundException as NoodlehausFileNotFoundException;
 use Noodlehaus\Exception\ParseException as NoodlehausParseException;
+use Noodlehaus\Parser\ParserInterface;
 use Symfony\Component\Filesystem\Filesystem;
 
 /**
@@ -21,11 +22,39 @@ use Symfony\Component\Filesystem\Filesystem;
 class ConfigLoader {
 
   /**
+   * A cache of config files keyed by path.
+   *
+   * @var \Noodlehaus\Config[]
+   */
+  private $cache = [];
+
+  /**
    * The filesystem.
    *
    * @var \Symfony\Component\Filesystem\Filesystem
    */
   private $filesystem;
+
+  /**
+   * The config file parser.
+   *
+   * @var \Noodlehaus\Parser\ParserInterface|null
+   */
+  private $parser;
+
+  /**
+   * The path to the config file.
+   *
+   * @var string
+   */
+  protected $path;
+
+  /**
+   * Whether or not to enable loading config from a string.
+   *
+   * @var bool
+   */
+  protected $string = FALSE;
 
   /**
    * Constructs an instance.
@@ -42,29 +71,36 @@ class ConfigLoader {
    *
    * @param string $path
    *   The filename of the configuration file.
+   * @param \Noodlehaus\Parser\ParserInterface|null $parser
+   *   The config file parser.
    *
    * @return \Noodlehaus\Config
    *   A config object.
    *
+   * @throws \Acquia\Orca\Exception\OrcaDirectoryNotFoundException
+   * @throws \Acquia\Orca\Exception\OrcaException
    * @throws \Acquia\Orca\Exception\OrcaFileNotFoundException
    * @throws \Acquia\Orca\Exception\OrcaParseError
-   * @throws \Acquia\Orca\Exception\OrcaException
    */
-  public function load(string $path): Config {
-    $this->assertDirectoryExists($path);
-    return $this->createConfig($path);
+  public function load(string $path, ?ParserInterface $parser = NULL): Config {
+    if (!empty($this->cache[$path])) {
+      return $this->cache[$path];
+    }
+
+    $this->path = $path;
+    $this->parser = $parser;
+    $this->assertDirectoryExists();
+    $this->cache[$path] = $this->createConfig();
+    return $this->cache[$path];
   }
 
   /**
    * Asserts that the config directory exists.
    *
-   * @param string $path
-   *   The config directory.
-   *
    * @throws \Acquia\Orca\Exception\OrcaDirectoryNotFoundException
    */
-  private function assertDirectoryExists(string $path): void {
-    $dir_path = $this->getDirPath($path);
+  protected function assertDirectoryExists(): void {
+    $dir_path = $this->getDirPath();
     if (!$this->filesystem->exists($dir_path)) {
       throw new OrcaDirectoryNotFoundException("SUT is absent from expected location: {$dir_path}");
     }
@@ -73,23 +109,17 @@ class ConfigLoader {
   /**
    * Gets the directory path from the given config file path.
    *
-   * @param string $path
-   *   The config file path.
-   *
    * @return string
    *   The parent directory path.
    */
-  private function getDirPath(string $path): string {
-    $parts = explode(DIRECTORY_SEPARATOR, $path);
+  private function getDirPath(): string {
+    $parts = explode(DIRECTORY_SEPARATOR, $this->path);
     array_pop($parts);
     return implode(DIRECTORY_SEPARATOR, $parts);
   }
 
   /**
    * Creates the config object.
-   *
-   * @param string $path
-   *   The path.
    *
    * @return \Noodlehaus\Config
    *   The config object.
@@ -98,9 +128,9 @@ class ConfigLoader {
    * @throws \Acquia\Orca\Exception\OrcaFileNotFoundException
    * @throws \Acquia\Orca\Exception\OrcaParseError
    */
-  protected function createConfig($path): Config {
+  protected function createConfig(): Config {
     try {
-      return $this->loadConfig($path);
+      return $this->loadConfig();
     }
     catch (NoodlehausFileNotFoundException $e) {
       throw new OrcaFileNotFoundException($e->getMessage());
@@ -118,14 +148,11 @@ class ConfigLoader {
    *
    * This method is extracted exclusively for testability.
    *
-   * @param string|array $path
-   *   The path.
-   *
    * @return \Noodlehaus\Config
    *   The config object.
    */
-  protected function loadConfig($path): Config {
-    return new Config($path);
+  protected function loadConfig(): Config {
+    return new Config($this->path, $this->parser, $this->string);
   }
 
 }

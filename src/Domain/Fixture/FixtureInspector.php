@@ -4,11 +4,10 @@ namespace Acquia\Orca\Domain\Fixture;
 
 use Acquia\Orca\Domain\Drush\DrushFacade;
 use Acquia\Orca\Domain\Fixture\Helper\ComposerJsonHelper;
+use Acquia\Orca\Domain\Fixture\Helper\ComposerLockHelper;
 use Acquia\Orca\Domain\Package\PackageManager;
 use Acquia\Orca\Domain\Server\WebServer;
 use Acquia\Orca\Helper\Filesystem\FixturePathHandler;
-use Noodlehaus\Config;
-use Noodlehaus\Parser\Json;
 use Symfony\Component\Console\Helper\TableSeparator;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
@@ -25,11 +24,11 @@ class FixtureInspector {
   private $composerJsonHelper;
 
   /**
-   * The fixture's composer.lock config.
+   * The fixture composer.lock helper.
    *
-   * @var \Noodlehaus\Config|null
+   * @var \Acquia\Orca\Domain\Fixture\Helper\ComposerLockHelper
    */
-  private $composerLock;
+  private $composerLockHelper;
 
   /**
    * The Drush facade.
@@ -85,6 +84,8 @@ class FixtureInspector {
    *
    * @param \Acquia\Orca\Domain\Fixture\Helper\ComposerJsonHelper $composer_json_helper
    *   The fixture composer.json helper.
+   * @param \Acquia\Orca\Domain\Fixture\Helper\ComposerLockHelper $composer_lock_helper
+   *   The fixture composer.lock helper.
    * @param \Acquia\Orca\Domain\Drush\DrushFacade $drush
    *   The Drush facade.
    * @param \Acquia\Orca\Helper\Filesystem\FixturePathHandler $fixture_path_handler
@@ -95,14 +96,10 @@ class FixtureInspector {
    *   The package manager.
    * @param \Acquia\Orca\Domain\Fixture\SubextensionManager $subextension_manager
    *   The subextension manager.
-   *
-   * @throws \Acquia\Orca\Exception\OrcaFileNotFoundException
-   * @throws \Acquia\Orca\Exception\OrcaFixtureNotExistsException
-   * @throws \Acquia\Orca\Exception\OrcaInvalidArgumentException
-   * @throws \Acquia\Orca\Exception\OrcaParseError
    */
-  public function __construct(ComposerJsonHelper $composer_json_helper, DrushFacade $drush, FixturePathHandler $fixture_path_handler, SymfonyStyle $output, PackageManager $package_manager, SubextensionManager $subextension_manager) {
+  public function __construct(ComposerJsonHelper $composer_json_helper, ComposerLockHelper $composer_lock_helper, DrushFacade $drush, FixturePathHandler $fixture_path_handler, SymfonyStyle $output, PackageManager $package_manager, SubextensionManager $subextension_manager) {
     $this->composerJsonHelper = $composer_json_helper;
+    $this->composerLockHelper = $composer_lock_helper;
     $this->drush = $drush;
     $this->fixture = $fixture_path_handler;
     $this->output = $output;
@@ -298,32 +295,18 @@ class FixtureInspector {
    * @return string|null
    *   The installed version of the given package if available (e.g., "1.0.0")
    *   or NULL if not.
+   *
+   * @throws \Acquia\Orca\Exception\OrcaFileNotFoundException
+   * @throws \Acquia\Orca\Exception\OrcaFixtureNotExistsException
+   * @throws \Acquia\Orca\Exception\OrcaParseError
    */
   public function getInstalledPackageVersion(string $package_name): ?string {
     $packages = [];
-    foreach ($this->getComposerLock()->get('packages') as $package) {
+    foreach ($this->composerLockHelper->getPackages() as $package) {
       $packages[$package['name']] = $package['version'];
     }
 
-    if (!array_key_exists($package_name, $packages)) {
-      return NULL;
-    }
-
-    return $packages[$package_name];
-  }
-
-  /**
-   * Gets the composer.lock config.
-   *
-   * @return \Noodlehaus\Config
-   *   The composer.lock config.
-   */
-  private function getComposerLock(): Config {
-    if (!$this->composerLock) {
-      $this->composerLock = new Config($this->fixture->getPath('composer.lock'), new Json());
-    }
-
-    return $this->composerLock;
+    return $packages[$package_name] ?? NULL;
   }
 
   /**
@@ -335,6 +318,10 @@ class FixtureInspector {
    *     a subextension and suffixed with a trailing asterisk (*) if it's the
    *     SUT.
    *   - The installed package version, e.g., "1.0.0".
+   *
+   * @throws \Acquia\Orca\Exception\OrcaFileNotFoundException
+   * @throws \Acquia\Orca\Exception\OrcaFixtureNotExistsException
+   * @throws \Acquia\Orca\Exception\OrcaParseError
    */
   private function getInstalledPackages(): array {
     $packages = [new TableSeparator()];

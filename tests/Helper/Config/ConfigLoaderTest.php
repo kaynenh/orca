@@ -11,6 +11,8 @@ use Exception;
 use Noodlehaus\Config;
 use Noodlehaus\Exception\FileNotFoundException as NoodlehausFileNotFoundException;
 use Noodlehaus\Exception\ParseException as NoodlehausParseException;
+use Noodlehaus\Parser\Json;
+use Noodlehaus\Parser\Yaml;
 use PHPUnit\Framework\TestCase;
 use Prophecy\Argument;
 use Symfony\Component\Filesystem\Filesystem;
@@ -29,7 +31,6 @@ class ConfigLoaderTest extends TestCase {
     $this->filesystem = $this->prophesize(Filesystem::class);
     $this->filesystem
       ->exists(Argument::any())
-      ->shouldBeCalledOnce()
       ->willReturn(TRUE);
   }
 
@@ -38,8 +39,9 @@ class ConfigLoaderTest extends TestCase {
 
     return new class ($filesystem) extends ConfigLoader {
 
-      public function loadConfig($path):  Config {
-        return parent::loadConfig([]);
+      public function loadConfig(): Config {
+        $this->path = [];
+        return parent::loadConfig();
       }
 
     };
@@ -53,6 +55,8 @@ class ConfigLoaderTest extends TestCase {
       ->willReturn(TRUE);
     $loader = $this->createConfigLoader();
 
+    $loader->load(self::CONFIG_FILE_PATH);
+    // Call again to test value caching.
     $loader->load(self::CONFIG_FILE_PATH);
 
     /* @noinspection UnnecessaryAssertionInspection */
@@ -87,7 +91,7 @@ class ConfigLoaderTest extends TestCase {
         parent::__construct($filesystem);
       }
 
-      public function loadConfig($path):  Config {
+      public function loadConfig():  Config {
         throw $this->caught;
       }
 
@@ -102,6 +106,50 @@ class ConfigLoaderTest extends TestCase {
       'File not found' => [new NoodlehausFileNotFoundException(), OrcaFileNotFoundException::class],
       'Parse error' => [new NoodlehausParseException(['message' => '']), OrcaParseError::class],
       'Unknown error' => [new Exception(), OrcaException::class],
+    ];
+  }
+
+  /**
+   * @dataProvider providerSpecifyParser
+   */
+  public function testLoadSpecifyParser($parser, $encoded, $decoded): void {
+    $filesystem = $this->filesystem->reveal();
+    $loader = new class ($filesystem, $encoded) extends ConfigLoader {
+
+      private $encoded;
+
+      public function __construct(Filesystem $filesystem, $encoded) {
+        parent::__construct($filesystem);
+        $this->encoded = $encoded;
+        $this->string = TRUE;
+      }
+
+      protected function assertDirectoryExists(): void {}
+
+      protected function loadConfig(): Config {
+        $this->path = $this->encoded;
+        return parent::loadConfig();
+      }
+
+    };
+
+    $config = $loader->load(self::CONFIG_FILE_PATH, $parser);
+
+    self::assertSame($decoded, $config->all());
+  }
+
+  public function providerSpecifyParser(): array {
+    return [
+      [
+        'parser' => new Json(),
+        'encoded' => '{"lorem": "ipsum"}',
+        'decoded' => ['lorem' => 'ipsum'],
+      ],
+      [
+        'parser' => new Yaml(),
+        'encoded' => 'dolor: sit',
+        'decoded' => ['dolor' => 'sit'],
+      ],
     ];
   }
 
